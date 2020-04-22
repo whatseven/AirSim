@@ -42,6 +42,16 @@ public:
     virtual void printLogMessage(const std::string& message,
         const std::string& message_param = "", unsigned char severity = 0) = 0;
 
+    //----------- Plotting APIs ----------/
+    virtual void simFlushPersistentMarkers() = 0;
+    virtual void simPlotPoints(const vector<Vector3r>& points, const vector<float>& color_rgba, float size, float duration, bool is_persistent) = 0; 
+    virtual void simPlotLineStrip(const vector<Vector3r>& points, const vector<float>& color_rgba, float thickness, float duration, bool is_persistent) = 0; 
+    virtual void simPlotLineList(const vector<Vector3r>& points, const vector<float>& color_rgba, float thickness, float duration, bool is_persistent) = 0; 
+    virtual void simPlotArrows(const vector<Vector3r>& points_start, const vector<Vector3r>& points_end, const vector<float>& color_rgba, float thickness, float arrow_size, float duration, bool is_persistent) = 0; 
+    virtual void simPlotStrings(const vector<std::string>& strings, const vector<Vector3r>& positions, float scale, const vector<float>& color_rgba, float duration) = 0;
+    virtual void simPlotTransforms(const vector<Pose>& poses, float scale, float thickness, float duration, bool is_persistent) = 0; 
+    virtual void simPlotTransformsWithNames(const vector<Pose>& poses, const vector<std::string>& names, float tf_scale, float tf_thickness, float text_scale, const vector<float>& text_color_rgba, float duration) = 0;
+
     virtual std::vector<std::string> listSceneObjects(const std::string& name_regex) const = 0;
     virtual Pose getObjectPose(const std::string& object_name) const = 0;
     virtual bool setObjectPose(const std::string& object_name, const Pose& pose, bool teleport) = 0;
@@ -67,6 +77,8 @@ public:
     virtual int resetIDFromView() = 0;
     virtual std::vector<std::vector<ImageCaptureBase::ImageResponse>> getMultipleImages(const std::vector<ImageCaptureBase::ImageRequest>& request_adapter
         , const std::vector<msr::airlib::VehicleSimApiBase*>& vehiclesApis) = 0;
+	virtual std::unique_ptr<std::vector<std::string>> swapTextures(const std::string& tag, int tex_id = 0, int component_id = 0, int material_id = 0) = 0;
+    virtual vector<MeshPositionVertexBuffersResponse> getMeshPositionVertexBuffers() const = 0;
 };
 
 

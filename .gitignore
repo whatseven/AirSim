@@ -358,11 +358,14 @@ xcuserdata/
 !*.xcworkspace/contents.xcworkspacedata
 /*.gcno
 
+# Unity
 /Unity/UnityDemo/Library
 /Unity/UnityDemo/Assembly-CSharp.csproj
 /Unity/UnityDemo/UnityDemo.sln
 /Unity/UnityDemo/Logs/
 /Unity/UnityDemo/Assets/Plugins/AirsimWrapper.dll
+/Unity/UnityDemo/Assets/Plugins/libAirsimWrapper.so
+/Unity/linux-build/
 
 # ROS
 ros/.catkin_tools/
@@ -370,3 +373,7 @@ ros/devel/
 ros/logs/
 ros/.catkin_workspace
 ros/src/CMakeLists.txt
+
+# docs
+docs/README.md
+build_docs/
