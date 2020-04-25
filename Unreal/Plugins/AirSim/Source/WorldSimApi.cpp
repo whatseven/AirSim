@@ -110,20 +110,21 @@ int WorldSimApi::resetIDFromView()
         std::regex regex;
         for (AActor* actor : foundActors) {
             std::string name(TCHAR_TO_UTF8(*(actor->GetName())));
-            float deltaTime = actor->GetWorld()->GetTimeSeconds() - actor->GetLastRenderTime();
-            bool visible=(deltaTime <= 0.04f) && (deltaTime > 0);
+            //float deltaTime = actor->GetWorld()->GetTimeSeconds() - actor->GetLastRenderTime();
+            //bool visible=(deltaTime <= 0.04f) && (deltaTime > 0);
             //visible = visible && actor->GetComponents();
             //deltaTime = deltaTime > 0 ? deltaTime : 0;
-            if (std::regex_match(name, std::regex("(sndd)(.*)")) ) {
-                UAirBlueprintLib::SetMeshStencilID(name, object_id, false);
-                object_id += 1;
-                UE_LOG(LogTemp, Warning, TEXT("%s, %f"),*(actor->GetName()),deltaTime);
-            }
-            else if (std::regex_match(name, std::regex("(BP_Sky_Sphere)(.*)")) ) {
-                UAirBlueprintLib::SetMeshStencilID(name, 1, false);
-            }
-            else
-                UAirBlueprintLib::SetMeshStencilID(name, 0, false);
+            //if (std::regex_match(name, std::regex("(sndd)(.*)")) ) {
+            //    UAirBlueprintLib::SetMeshStencilID(name, object_id, false);
+            //    object_id += 1;
+            //    UE_LOG(LogTemp, Warning, TEXT("%s, %f"),*(actor->GetName()),deltaTime);
+            //}
+            //else if (std::regex_match(name, std::regex("(BP_Sky_Sphere)(.*)")) ) {
+            //    UAirBlueprintLib::SetMeshStencilID(name, 1, false);
+            //}
+            //else
+            //    UAirBlueprintLib::SetMeshStencilID(name, 0, false);
+            UAirBlueprintLib::SetMeshStencilID(name, 0, false);
 
         }
         if (object_id > 255) {
