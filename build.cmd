@@ -80,7 +80,7 @@ ECHO Starting cmake to build rpclib...
 IF NOT EXIST external\rpclib\rpclib-2.2.1\build mkdir external\rpclib\rpclib-2.2.1\build
 cd external\rpclib\rpclib-2.2.1\build
 REM cmake -G"Visual Studio 14 2015 Win64" ..
-cmake -G"Visual Studio 16 2019" ..
+cmake -G"Visual Studio 16 2019" -A x64 ..
 
 if "%buildMode%" == "--Debug" (
 cmake --build . --config Debug
