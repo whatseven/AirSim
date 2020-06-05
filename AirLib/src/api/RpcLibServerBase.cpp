@@ -182,6 +182,10 @@ RpcLibServerBase::RpcLibServerBase(ApiProvider* api_provider, const std::string&
         return getWorldSimApi()->setSegmentationObjectID(mesh_name, object_id, is_name_regex);
     });
     pimpl_->server.
+        bind("simSetSegmentationObjectIDMultiple", [&](const std::map<std::string,int>& color_map, bool is_name_regex) -> bool {
+        return getWorldSimApi()->setSegmentationObjectIDMultiple(color_map, is_name_regex);
+    });
+    pimpl_->server.
         bind("simGetSegmentationObjectID", [&](const std::string& mesh_name) -> int {
         return getWorldSimApi()->getSegmentationObjectID(mesh_name);
     });    

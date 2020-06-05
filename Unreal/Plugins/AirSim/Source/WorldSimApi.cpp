@@ -152,6 +152,17 @@ bool WorldSimApi::setSegmentationObjectID(const std::string& mesh_name, int obje
     return success;
 }
 
+bool WorldSimApi::setSegmentationObjectIDMultiple(const std::map<string,int>& color_map, bool is_name_regex){
+    bool success;
+    UAirBlueprintLib::RunCommandOnGameThread([&color_map, is_name_regex, &success]() {
+        for (auto iter = color_map.begin(); iter != color_map.end();iter++)
+            success = UAirBlueprintLib::SetMeshStencilID(iter->first, iter->second, is_name_regex);
+    },
+        true);
+    return success;
+}
+
+
 int WorldSimApi::getSegmentationObjectID(const std::string& mesh_name) const
 {
     int result;

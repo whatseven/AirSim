@@ -29,6 +29,7 @@ public:
     virtual void setWeatherParameter(WeatherParameter param, float val);
 
     virtual bool setSegmentationObjectID(const std::string& mesh_name, int object_id, bool is_name_regex = false) override;
+    virtual bool setSegmentationObjectIDMultiple(const std::map<string,int>& color_map, bool is_name_regex = false) override;
     virtual int getSegmentationObjectID(const std::string& mesh_name) const override;
 
     virtual void printLogMessage(const std::string& message,

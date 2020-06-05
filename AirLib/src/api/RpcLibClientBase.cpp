@@ -198,6 +198,10 @@ bool RpcLibClientBase::simSetSegmentationObjectID(const std::string& mesh_name, 
 {
     return pimpl_->client.call("simSetSegmentationObjectID", mesh_name, object_id, is_name_regex).as<bool>();
 }
+bool RpcLibClientBase::simSetSegmentationObjectIDMultiple(const std::map<string,int>& color_map, bool is_name_regex)
+{
+    return pimpl_->client.call("simSetSegmentationObjectIDMultiple", color_map, is_name_regex).as<bool>();
+}
 int RpcLibClientBase::simGetSegmentationObjectID(const std::string& mesh_name) const
 {
     return pimpl_->client.call("simGetSegmentationObjectID", mesh_name).as<int>();
