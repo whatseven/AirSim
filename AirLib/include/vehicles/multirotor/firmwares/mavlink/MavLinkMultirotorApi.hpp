@@ -38,7 +38,6 @@
 
 namespace msr { namespace airlib {
 
-
 class MavLinkMultirotorApi : public MultirotorApiBase
 {
 public: //methods
@@ -933,11 +932,11 @@ private: //methods
             mavlinkcom::SerialPortInfo info = *iter;
             if ((
                 (info.vid == pixhawkVendorId) &&
-                    (info.pid == pixhawkFMUV4ProductId || info.pid == pixhawkFMUV2ProductId || info.pid == pixhawkFMUV2OldBootloaderProductId)
-                    ) ||
-                    (
-                (info.displayName.find(L"PX4_") != std::string::npos)
-                )) {
+                (info.pid == pixhawkFMUV4ProductId || info.pid == pixhawkFMUV2ProductId || info.pid == pixhawkFMUV2OldBootloaderProductId)
+                ) ||
+                (
+                    (info.displayName.find(L"PX4_") != std::string::npos)
+                    )) {
                 // printf("Auto Selecting COM port: %S\n", info.displayName.c_str());
 
                 std::string portName_str;
@@ -972,6 +971,7 @@ private: //methods
         got_first_heartbeat_ = false;
         is_hil_mode_set_ = false;
         is_armed_ = false;
+        has_home_ = false;
         is_controls_0_1_ = true;
         Utils::setValue(rotor_controls_, 0.0f);
 
@@ -999,7 +999,7 @@ private: //methods
 
             connection_ = mavlinkcom::MavLinkConnection::connectRemoteUdp("hil", connection_info_.local_host_ip, connection_info.udp_address, connection_info.udp_port);
         }
-        else  {
+        else {
             throw std::invalid_argument("Please provide valid connection info for your drone.");
         }
 
@@ -1040,22 +1040,31 @@ private: //methods
             mav_vehicle_->connect(gcsConnection);
 
             addStatusMessage(std::string("Ground control connected over UDP."));
-
-            // listen to this UDP mavlink connection also
-            auto mavcon = mav_vehicle_->getConnection();
-            if (mavcon != connection_) {
-                mavcon->subscribe([=](std::shared_ptr<mavlinkcom::MavLinkConnection> connection, const mavlinkcom::MavLinkMessage& msg) {
-                    unused(connection);
-                    processMavMessages(msg);
-                    });
-            }
-            else {
-                mav_vehicle_->connect(connection_);
-            }
-
-            connected_ = true;
-            mav_vehicle_->startHeartbeat();
         }
+
+        connectVehicle();
+    }
+
+    void connectVehicle()
+    {
+        // listen to this UDP mavlink connection also
+        auto mavcon = mav_vehicle_->getConnection();
+        if (mavcon != connection_) {
+            mavcon->subscribe([=](std::shared_ptr<mavlinkcom::MavLinkConnection> connection, const mavlinkcom::MavLinkMessage& msg) {
+                unused(connection);
+                processMavMessages(msg);
+                });
+        }
+        else {
+            mav_vehicle_->connect(connection_);
+        }
+
+        connected_ = true;
+        // now we can start our heartbeats.
+        mav_vehicle_->startHeartbeat();
+
+        // Also request home position messages
+        mav_vehicle_->setMessageInterval(mavlinkcom::MavLinkHomePosition::kMessageId, 1);
     }
 
     void createMavSerialConnection(const std::string& port_name, int baud_rate)
@@ -1100,7 +1109,6 @@ private: //methods
                 mav_vehicle_ = std::make_shared<mavlinkcom::MavLinkVehicle>(connection_info_.vehicle_sysid, connection_info_.vehicle_compid);
                 mav_vehicle_->connect(connection_); // in this case we can use the same connection.
                 mav_vehicle_->startHeartbeat();
-
                 // start listening to the HITL connection.
                 connection_->subscribe([=](std::shared_ptr<mavlinkcom::MavLinkConnection> connection, const mavlinkcom::MavLinkMessage& msg) {
                     unused(connection);
@@ -1210,6 +1218,7 @@ private: //methods
                     // and it scales multi rotor servo output to 0 to 1.
                     is_controls_0_1_ = false;
                 }
+
                 send_params_ = true;
             }
             else if (is_simulation_mode_ && !is_hil_mode_set_) {
@@ -1235,7 +1244,6 @@ private: //methods
                 std::lock_guard<std::mutex> guard_controls(hil_controls_mutex_);
 
                 HilControlsMessage.decode(msg);
-                //is_arned_ = (HilControlsMessage.mode & 128) > 0; //TODO: is this needed?
                 rotor_controls_[0] = HilControlsMessage.roll_ailerons;
                 rotor_controls_[1] = HilControlsMessage.pitch_elevator;
                 rotor_controls_[2] = HilControlsMessage.yaw_rudder;
@@ -1264,13 +1272,13 @@ private: //methods
                     rotor_controls_[i] = 0;
                 }
             }
-            if (isarmed)
-            {
+            if (isarmed) {
                 normalizeRotorControls();
             }
             received_actuator_controls_ = true;
             // if the timestamps match then it means we are in lockstep mode.
             if (!lock_step_enabled_) {
+                // && (HilActuatorControlsMessage.flags & 0x1))    // todo: enable this check when this flag is widely available...
                 if (hil_sensor_clock_ == HilActuatorControlsMessage.time_usec) {
                     addStatusMessage("Enabling lockstep mode");
                     lock_step_enabled_ = true;
@@ -1286,6 +1294,11 @@ private: //methods
                 addStatusMessage("Got GPS lock");
                 has_gps_lock_ = true;
             }
+            if (!has_home_ && current_state_.home.is_set) {
+                addStatusMessage("Got GPS Home Location");
+                has_home_ = true;
+            }
+
         }
         else if (msg.msgid == mavlinkcom::MavLinkLocalPositionNed::kMessageId) {
             // we are getting position information... so we can use this to check the stability of the z coordinate before takeoff.
@@ -1297,6 +1310,10 @@ private: //methods
         else if (msg.msgid == mavlinkcom::MavLinkExtendedSysState::kMessageId) {
             // check landed state.
             getLandedState();
+        }
+        else if (msg.msgid == mavlinkcom::MavLinkHomePosition::kMessageId) {
+            mavlinkcom::MavLinkHomePosition home;
+            home.decode(msg);
         }
         //else ignore message
     }
@@ -1329,25 +1346,29 @@ private: //methods
         hil_sensor.xacc = acceleration.x();
         hil_sensor.yacc = acceleration.y();
         hil_sensor.zacc = acceleration.z();
+        hil_sensor.fields_updated = 0b111; // Set accel bit fields
+
         hil_sensor.xgyro = gyro.x();
         hil_sensor.ygyro = gyro.y();
         hil_sensor.zgyro = gyro.z();
 
-        hil_sensor.fields_updated = 0b111 | 0b111000; // Set accel and gyro bit fields respectively
+        hil_sensor.fields_updated |= 0b111000; // Set gyro bit fields 
 
         hil_sensor.xmag = mag.x();
         hil_sensor.ymag = mag.y();
         hil_sensor.zmag = mag.z();
 
-        hil_sensor.fields_updated = hil_sensor.fields_updated | 0b111000000; // Set mag bit field
+        hil_sensor.fields_updated |= 0b111000000; // Set mag bit fields
 
         hil_sensor.abs_pressure = abs_pressure;
         hil_sensor.pressure_alt = pressure_alt;
 
-        hil_sensor.fields_updated = hil_sensor.fields_updated | 0b1101000000000; // Set baro bit field
+        hil_sensor.fields_updated |= 0b1101000000000; // Set baro bit fields
 
         //TODO: enable temperature? diff_pressure
-        hil_sensor.fields_updated = was_reset_ ? (1 << 31) : hil_sensor.fields_updated;
+        if (was_reset_) {
+            hil_sensor.fields_updated = static_cast<uint32_t>(1 << 31);
+        }
 
         if (hil_node_ != nullptr) {
             hil_node_->sendMessage(hil_sensor);
@@ -1391,7 +1412,7 @@ private: //methods
         mavlinkcom::MavLinkHilGps hil_gps;
         hil_gps.time_usec = hil_sensor_clock_;
         hil_gps.lat = static_cast<int32_t>(geo_point.latitude * 1E7);
-        hil_gps.lon = static_cast<int32_t>(geo_point.longitude* 1E7);
+        hil_gps.lon = static_cast<int32_t>(geo_point.longitude * 1E7);
         hil_gps.alt = static_cast<int32_t>(geo_point.altitude * 1000);
         hil_gps.vn = static_cast<int16_t>(velocity.x() * 100);
         hil_gps.ve = static_cast<int16_t>(velocity.y() * 100);
@@ -1401,7 +1422,7 @@ private: //methods
         hil_gps.fix_type = static_cast<uint8_t>(fix_type);
         hil_gps.vel = static_cast<uint16_t>(velocity_xy * 100);
         hil_gps.cog = static_cast<uint16_t>(cog * 100);
-        hil_gps.satellites_visible = static_cast<uint8_t>(satellites_visible);
+        hil_gps.satellites_visible = static_cast<uint8_t>(15);
 
         if (hil_node_ != nullptr) {
             hil_node_->sendMessage(hil_gps);
@@ -1510,6 +1531,7 @@ private: //variables
     uint64_t last_hil_sensor_time_ = 0;
     uint64_t hil_sensor_clock_ = 0;
     bool was_reset_ = false;
+    bool has_home_ = false;
     bool is_ready_ = false;
     bool has_gps_lock_ = false;
     bool lock_step_enabled_ = false;
@@ -1537,7 +1559,6 @@ private: //variables
     mutable int state_version_;
     mutable mavlinkcom::VehicleState current_state_;
 };
-
-
-}} //namespace
+}
+} //namespace
 #endif
